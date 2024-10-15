@@ -1,0 +1,4 @@
+venv/
+word-data/
+.env
+**/__pycache__/
