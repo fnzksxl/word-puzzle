@@ -1,6 +1,7 @@
 import random
 from collections import deque
 from fastapi import Depends
+from sqlalchemy import func
 from sqlalchemy.orm.session import Session
 from typing import List, Tuple, Deque, Dict
 
@@ -68,6 +69,23 @@ async def find_first_word_info(db: Session = Depends(get_db)) -> WordInfo:
     return db.query(WordInfo).filter(WordInfo.id == random_idx).first()
 
 
+async def find_word_info_start_with(start_word: str, db: Session) -> WordInfo:
+    """
+    DB에서 {start_word}로 시작하는 단어를 찾아 반환한다.
+    Args:
+        db (Session): 커넥션
+        start_word (str): 시작 어절
+    Returns:
+        WordInfo: {start_word}로 시작하는 WordInfo Row 객체
+    """
+    return (
+        db.query(WordInfo)
+        .filter(WordInfo.word.like(f"{start_word}%"))
+        .order_by(func.rand())
+        .first()
+    )
+
+
 async def create_puzzle_phase1(
     word: WordInfo = Depends(find_first_word_info), map: List[str] = Depends(create_map)
 ) -> Dict:
@@ -94,3 +112,82 @@ async def create_puzzle_phase1(
     queue = await append_letter_into_queue((start_y, start_x), word.len, word.word, queue, True)
 
     return {"map": map, "queue": queue, "desc": desc, "words": words}
+
+
+async def create_puzzle_phase2(
+    db: Session = Depends(get_db), map_queue_desc: Dict = Depends(create_puzzle_phase1)
+) -> Dict:
+    """
+    단어 하나가 삽입된 상태에서, 시작 어절이 같은 단어를 찾아 추가한다.
+    단, 진행방향의 삼면에 이미 다른 단어의 어절이 없어야 한다.
+    이 함수는 두 번째 페이즈로, 처음 추가된 단어와 이어지는 경우에만 단어를 추가한다.
+
+    Args:
+        db (Session): 커넥션
+        map_queue_desc (Dict): 맵, 큐, 설명 및 단어가 들어있는 사전형 자료
+    Returns:
+        Dict: 맵, 큐, 설명 및 단어가 들어있는 사전형 자료
+    """
+    map = map_queue_desc.get("map")
+    queue = map_queue_desc.get("queue")
+    desc = map_queue_desc.get("desc")
+    words = map_queue_desc.get("words")
+    num = 2
+    while queue:
+        point, start_word, dir = queue.popleft()
+        next_word = await find_word_info_start_with(start_word, db)
+        if not next_word:
+            continue
+        if (next_word) and (
+            (dir and point[1] + next_word.len < 11) or (not dir and point[0] + next_word.len < 11)
+        ):
+            if point[1] >= 1:
+                if dir and map[point[0]][point[1] - 1] != 0:
+                    continue
+            if point[0] >= 1:
+                if not dir and map[point[0] - 1][point[1]] != 0:
+                    continue
+
+            original_value = map[point[0]][point[1]]
+            for i in range(next_word.len):
+                if dir:
+                    if i and map[point[0]][point[1] + i] != 0:
+                        for j in range(i):
+                            map[point[0]][point[1] + j] = original_value
+                        break
+                    if i and (
+                        (point[1] + i + 1 < 11 and map[point[0]][point[1] + i + 1] != 0)
+                        or (point[0] - 1 >= 0 and map[point[0] - 1][point[1] + i] != 0)
+                        or (point[0] + 1 < 11 and map[point[0] + 1][point[1] + i] != 0)
+                    ):
+                        for j in range(1, i):
+                            map[point[0]][point[1] + j] = 0
+                        map[point[0]][point[1]] = original_value
+                        break
+
+                    map[point[0]][point[1] + i] = num
+                else:
+                    if i and map[point[0] + i][point[1]] != 0:
+                        for j in range(i):
+                            map[point[0] + j][point[1]] = original_value
+                        break
+                    if i and (
+                        (point[1] - 1 >= 0 and map[point[0] + i][point[1] - 1] != 0)
+                        or (point[1] + 1 < 11 and map[point[0] + i][point[1] + 1] != 0)
+                        or (point[0] + i + 1 < 11 and map[point[0] + i + 1][point[1]] != 0)
+                    ):
+                        for j in range(1, i):
+                            map[point[0] + j][point[1]] = 0
+                        map[point[0]][point[1]] = original_value
+                        break
+                    map[point[0] + i][point[1]] = num
+
+            else:
+                words.append({"num": num, "word": next_word.word})
+                desc.append({"num": num, "desc": next_word.desc})
+                num += 1
+
+                queue = await append_letter_into_queue(
+                    point, next_word.len, next_word.word, queue, dir
+                )
+    return {"map": map, "desc": desc, "words": words}
