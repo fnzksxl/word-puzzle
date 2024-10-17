@@ -10,7 +10,7 @@ class BaseMin:
 class WordInfo(BaseMin, Base):
     __tablename__ = "wordinfo"
 
-    word = Column(VARCHAR(5), nullable=False)
+    word = Column(VARCHAR(5), nullable=False, index=True)
     desc = Column(VARCHAR(200), nullable=False)
-    len = Column(Integer, nullable=False, index=True)
+    len = Column(Integer, nullable=False)
     pos = Column(VARCHAR(7), nullable=False)
