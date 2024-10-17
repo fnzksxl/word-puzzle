@@ -69,7 +69,7 @@ async def find_first_word_info(db: Session = Depends(get_db)) -> WordInfo:
     return db.query(WordInfo).filter(WordInfo.id == random_idx).first()
 
 
-async def find_word_info_start_with(start_word: str, db: Session) -> WordInfo:
+async def find_word_info_start_with(start_word: str, limit: int, db: Session) -> WordInfo:
     """
     DB에서 {start_word}로 시작하는 단어를 찾아 반환한다.
     Args:
@@ -81,6 +81,7 @@ async def find_word_info_start_with(start_word: str, db: Session) -> WordInfo:
     return (
         db.query(WordInfo)
         .filter(WordInfo.word.like(f"{start_word}%"))
+        .filter(WordInfo.len <= limit)
         .order_by(func.rand())
         .first()
     )
@@ -114,6 +115,46 @@ async def create_puzzle_phase1(
     return {"map": map, "queue": queue, "desc": desc, "words": words}
 
 
+async def inspect_possible_length(map: List[int], point: Tuple[int, int], dir: bool) -> int:
+    """
+    추가할 수 있는 단어의 길이를 반환해주는 함수
+
+    Args:
+        map (List[int]): 퍼즐 맵 정보
+        point (Tuple[int, int]): 새로운 단어의 시작 지점
+        dir (bool): 가로,세로 여부
+    Returns:
+        Int: 추가할 수 있는 단어의 길이
+    """
+    if point[1] >= 1:
+        if dir and map[point[0]][point[1] - 1] != 0:
+            return 0
+    if point[0] >= 1:
+        if not dir and map[point[0] - 1][point[1]] != 0:
+            return 0
+
+    if dir:
+        for i in range(1, 5):
+            if (
+                (point[0] - 1 >= 0 and map[point[0] - 1][point[1] + i] != 0)
+                or (point[0] + 1 < len(map) and map[point[0] + 1][point[1] + i] != 0)
+                or (point[1] + i < len(map[0]) - 1 and map[point[0]][point[1] + i + 1] != 0)
+                or (point[1] + i == len(map[0]) - 1)
+            ):
+                return i
+    else:
+        for i in range(1, 5):
+            if (
+                (point[1] - 1 >= 0 and map[point[0] + i][point[1] - 1] != 0)
+                or (point[1] + 1 < len(map[0]) and map[point[0] + i][point[1] + 1] != 0)
+                or (point[0] + i < len(map) - 1 and map[point[0] + i + 1][point[1]] != 0)
+                or (point[0] + i == len(map) - 1)
+            ):
+                return i
+
+    return 5
+
+
 async def create_puzzle_phase2(
     db: Session = Depends(get_db), map_queue_desc: Dict = Depends(create_puzzle_phase1)
 ) -> Dict:
@@ -135,59 +176,23 @@ async def create_puzzle_phase2(
     num = 2
     while queue:
         point, start_word, dir = queue.popleft()
-        next_word = await find_word_info_start_with(start_word, db)
+        limit = await inspect_possible_length(map, point, dir)
+
+        if limit <= 1:
+            continue
+        next_word = await find_word_info_start_with(start_word, limit, db)
         if not next_word:
             continue
-        if (next_word) and (
-            (dir and point[1] + next_word.len < 11) or (not dir and point[0] + next_word.len < 11)
-        ):
-            if point[1] >= 1:
-                if dir and map[point[0]][point[1] - 1] != 0:
-                    continue
-            if point[0] >= 1:
-                if not dir and map[point[0] - 1][point[1]] != 0:
-                    continue
-
-            original_value = map[point[0]][point[1]]
-            for i in range(next_word.len):
-                if dir:
-                    if i and map[point[0]][point[1] + i] != 0:
-                        for j in range(i):
-                            map[point[0]][point[1] + j] = original_value
-                        break
-                    if i and (
-                        (point[1] + i + 1 < 11 and map[point[0]][point[1] + i + 1] != 0)
-                        or (point[0] - 1 >= 0 and map[point[0] - 1][point[1] + i] != 0)
-                        or (point[0] + 1 < 11 and map[point[0] + 1][point[1] + i] != 0)
-                    ):
-                        for j in range(1, i):
-                            map[point[0]][point[1] + j] = 0
-                        map[point[0]][point[1]] = original_value
-                        break
-
-                    map[point[0]][point[1] + i] = num
-                else:
-                    if i and map[point[0] + i][point[1]] != 0:
-                        for j in range(i):
-                            map[point[0] + j][point[1]] = original_value
-                        break
-                    if i and (
-                        (point[1] - 1 >= 0 and map[point[0] + i][point[1] - 1] != 0)
-                        or (point[1] + 1 < 11 and map[point[0] + i][point[1] + 1] != 0)
-                        or (point[0] + i + 1 < 11 and map[point[0] + i + 1][point[1]] != 0)
-                    ):
-                        for j in range(1, i):
-                            map[point[0] + j][point[1]] = 0
-                        map[point[0]][point[1]] = original_value
-                        break
-                    map[point[0] + i][point[1]] = num
-
+        for i in range(next_word.len):
+            if dir:
+                map[point[0]][point[1] + i] = num
             else:
-                words.append({"num": num, "word": next_word.word})
-                desc.append({"num": num, "desc": next_word.desc})
-                num += 1
+                map[point[0] + i][point[1]] = num
 
-                queue = await append_letter_into_queue(
-                    point, next_word.len, next_word.word, queue, dir
-                )
+        words.append({"num": num, "word": next_word.word})
+        desc.append({"num": num, "desc": next_word.desc})
+        num += 1
+
+        queue = await append_letter_into_queue(point, next_word.len, next_word.word, queue, dir)
+
     return {"map": map, "desc": desc, "words": words}
