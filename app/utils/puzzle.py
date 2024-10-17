@@ -110,18 +110,30 @@ class PuzzleCreateService:
             (start_y, start_x), word.len, word.word, True
         )
 
-    async def inspect_possible_length(self, point: Tuple[int, int], dir: bool) -> int:
+    async def inspect_possible_length(
+        self, point: Tuple[int, int], dir: bool, phase: int = 2
+    ) -> int:
         """
         단어의 시작 좌표와 방향으로 가능한 단어의 최대 길이를 반환한다.
 
         Args:
             point (Tuple[int,int]): 단어가 시작될 좌표
             dir (bool): 단어의 가로, 세로 여부
+            phase (int): 퍼즐 생성 단계
         Returns:
             int: 가능한 단어의 길이
         """
         y, x = point
 
+        if phase == 3:
+            if y > 0 and self.map[y - 1][x] != 0:
+                return 0
+            if y < self.map_size - 1 and self.map[y + 1][x] != 0:
+                return 0
+            if x > 0 and self.map[y][x - 1] != 0:
+                return 0
+            if x < self.map_size - 1 and self.map[y][x + 1] != 0:
+                return 0
         if x >= 1:
             if dir and self.map[y][x - 1] != 0:
                 return 0
@@ -178,19 +190,47 @@ class PuzzleCreateService:
                 point, next_word.len, next_word.word, dir
             )
 
-    async def create_puzzle_phase2(self) -> Dict:
+    async def create_puzzle_phase2(self) -> None:
         """
         단어 하나가 삽입된 상태에서, 시작 어절이 같은 단어를 찾아 추가한다.
         단, 진행방향의 삼면에 이미 다른 단어의 어절이 없어야 한다.
         이 함수는 두 번째 페이즈로, 처음 추가된 단어와 이어지는 경우에만 단어를 추가한다.
-
-        Args:
-            db (Session): 커넥션
-            map_queue_desc (Dict): 맵, 큐, 설명 및 단어가 들어있는 사전형 자료
-        Returns:
-            Dict: 맵, 큐, 설명 및 단어가 들어있는 사전형 자료
         """
         await self.create_puzzle_phase1()
         await self.fill_puzzle_until_queue_empty()
+
+    async def create_puzzle_phase3(self) -> Dict:
+        """
+        퍼즐의 비어있는 공간에 단어를 추가한다.
+        Returns:
+            Returns:
+            Dict: 맵, 설명 및 단어가 들어있는 사전형 자료
+        """
+        await self.create_puzzle_phase2()
+        for i in range(self.map_size - 1):
+            for j in range(self.map_size - 1):
+                if self.map[i][j] == 0:
+                    hor = await self.inspect_possible_length((i, j), True, phase=3)
+                    ver = await self.inspect_possible_length((i, j), False, phase=3)
+                    dir = True if hor > ver else False
+                    if not (hor and ver):
+                        continue
+                    else:
+                        word = await self.find_word_info_start_with("", hor if hor > ver else ver)
+                        if not word:
+                            continue
+                        for k in range(word.len):
+                            if dir:
+                                self.map[i][j + k] = self.num
+                            else:
+                                self.map[i + k][j] = self.num
+
+                        self.words.append({"num": self.num, "word": word.word})
+                        self.desc.append({"num": self.num, "desc": word.desc})
+                        self.num += 1
+                        self.queue = await self.append_letter_into_queue(
+                            (i, j), word.len, word.word, dir
+                        )
+                        await self.fill_puzzle_until_queue_empty()
 
         return {"map": self.map, "desc": self.desc, "words": self.words}
