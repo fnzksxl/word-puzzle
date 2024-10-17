@@ -150,19 +150,10 @@ class PuzzleCreateService:
 
         return 5
 
-    async def create_puzzle_phase2(self) -> Dict:
+    async def fill_puzzle_until_queue_empty(self) -> None:
         """
-        단어 하나가 삽입된 상태에서, 시작 어절이 같은 단어를 찾아 추가한다.
-        단, 진행방향의 삼면에 이미 다른 단어의 어절이 없어야 한다.
-        이 함수는 두 번째 페이즈로, 처음 추가된 단어와 이어지는 경우에만 단어를 추가한다.
-
-        Args:
-            db (Session): 커넥션
-            map_queue_desc (Dict): 맵, 큐, 설명 및 단어가 들어있는 사전형 자료
-        Returns:
-            Dict: 맵, 큐, 설명 및 단어가 들어있는 사전형 자료
+        큐가 빌 때까지 퍼즐에 단어를 추가시킨다.
         """
-        await self.create_puzzle_phase1()
         while self.queue:
             point, start_word, dir = self.queue.popleft()
             limit = await self.inspect_possible_length(point, dir)
@@ -186,5 +177,20 @@ class PuzzleCreateService:
             self.queue = await self.append_letter_into_queue(
                 point, next_word.len, next_word.word, dir
             )
+
+    async def create_puzzle_phase2(self) -> Dict:
+        """
+        단어 하나가 삽입된 상태에서, 시작 어절이 같은 단어를 찾아 추가한다.
+        단, 진행방향의 삼면에 이미 다른 단어의 어절이 없어야 한다.
+        이 함수는 두 번째 페이즈로, 처음 추가된 단어와 이어지는 경우에만 단어를 추가한다.
+
+        Args:
+            db (Session): 커넥션
+            map_queue_desc (Dict): 맵, 큐, 설명 및 단어가 들어있는 사전형 자료
+        Returns:
+            Dict: 맵, 큐, 설명 및 단어가 들어있는 사전형 자료
+        """
+        await self.create_puzzle_phase1()
+        await self.fill_puzzle_until_queue_empty()
 
         return {"map": self.map, "desc": self.desc, "words": self.words}
