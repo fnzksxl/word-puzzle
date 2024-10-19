@@ -7,6 +7,7 @@ from sqlalchemy import func
 
 from app.models import WordInfo, Puzzle, PuzzleAnswer
 from app.database import get_db
+from app.exceptions.puzzle import PuzzleNotExistException
 
 
 class PuzzleCreateService:
@@ -282,6 +283,8 @@ class PuzzleReadService:
             Dict: 퍼즐, 정답 정보가 담긴 사전 데이터
         """
         puzzle = self.db.query(Puzzle).filter(Puzzle.id == puzzle_id).first()
+        if puzzle is None:
+            raise PuzzleNotExistException()
         answer = (
             self.db.query(PuzzleAnswer.num, WordInfo.pos, WordInfo.desc, WordInfo.word)
             .join(WordInfo, PuzzleAnswer.word_id == WordInfo.id)
