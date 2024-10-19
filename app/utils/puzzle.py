@@ -5,7 +5,7 @@ from sqlalchemy.orm.session import Session
 from typing import List, Tuple, Deque, Dict, Optional
 from sqlalchemy import func
 
-from app.models import WordInfo
+from app.models import WordInfo, Puzzle, PuzzleAnswer
 from app.database import get_db
 
 
@@ -21,7 +21,6 @@ class PuzzleCreateService:
         self.map = self.create_map()
         self.queue = deque()
         self.desc = []
-        self.words = []
         self.num = 2
         self.word_size = 494047
 
@@ -32,7 +31,7 @@ class PuzzleCreateService:
         return [[0 for _ in range(self.map_size)] for _ in range(self.map_size)]
 
     async def append_letter_into_queue(
-        self, start_point: Tuple[int, int], length: int, word: str, dir: bool
+        self, start_point: Tuple[int, int], length: int, word: str, dir: bool, first: bool = False
     ) -> Deque:
         """
         시작점, 길이, 단어, 방향을 토대로 큐에 다음 단어 추가에 대한 힌트를 큐에 삽입 후 반환한다.
@@ -55,7 +54,7 @@ class PuzzleCreateService:
         else:
             add_to_queue((start_point[0] + length - 1, start_point[1]), word[-1], dir)
 
-        if length > 2:
+        if length > 2 and first:
             if length >= 5:
                 if dir:
                     add_to_queue((start_point[0], start_point[1] + 2), word[2], dir)
@@ -100,14 +99,23 @@ class PuzzleCreateService:
         """
         word = await self.find_first_word_info()
         start_y, start_x = 0, 0
+        dir = random.choice([True, False])
 
         for i in range(word.len):
-            self.map[start_y][start_x + i] = 1
+            if dir:
+                self.map[start_y][start_x + i] = 1
+            else:
+                self.map[start_y + i][start_x] = 1
 
-        self.words.append({"num": 1, "word": word.word})
-        self.desc.append({"num": 1, "desc": word.desc})
+        self.desc.append(
+            {
+                "num": 1,
+                "desc": {"desc": word.desc, "pos": word.pos, "word": word.word},
+                "id": word.id,
+            }
+        )
         self.queue = await self.append_letter_into_queue(
-            (start_y, start_x), word.len, word.word, True
+            (start_y, start_x), word.len, word.word, dir, first=True
         )
 
     async def inspect_possible_length(
@@ -167,7 +175,10 @@ class PuzzleCreateService:
         큐가 빌 때까지 퍼즐에 단어를 추가시킨다.
         """
         while self.queue:
-            point, start_word, dir = self.queue.popleft()
+            idx = random.randint(0, len(self.queue) - 1)
+            point, start_word, dir = self.queue[idx]
+            del self.queue[idx]
+
             limit = await self.inspect_possible_length(point, dir)
 
             if limit <= 1:
@@ -182,8 +193,13 @@ class PuzzleCreateService:
                 else:
                     self.map[point[0] + i][point[1]] = self.num
 
-            self.words.append({"num": self.num, "word": next_word.word})
-            self.desc.append({"num": self.num, "desc": next_word.desc})
+            self.desc.append(
+                {
+                    "num": self.num,
+                    "desc": {"desc": next_word.desc, "pos": next_word.pos, "word": next_word.word},
+                    "id": next_word.id,
+                }
+            )
             self.num += 1
 
             self.queue = await self.append_letter_into_queue(
@@ -203,7 +219,6 @@ class PuzzleCreateService:
         """
         퍼즐의 비어있는 공간에 단어를 추가한다.
         Returns:
-            Returns:
             Dict: 맵, 설명 및 단어가 들어있는 사전형 자료
         """
         await self.create_puzzle_phase2()
@@ -225,12 +240,56 @@ class PuzzleCreateService:
                             else:
                                 self.map[i + k][j] = self.num
 
-                        self.words.append({"num": self.num, "word": word.word})
-                        self.desc.append({"num": self.num, "desc": word.desc})
+                        self.desc.append(
+                            {
+                                "num": self.num,
+                                "desc": {"desc": word.desc, "pos": word.pos, "word": word.word},
+                                "id": word.id,
+                            }
+                        )
                         self.num += 1
                         self.queue = await self.append_letter_into_queue(
-                            (i, j), word.len, word.word, dir
+                            (i, j), word.len, word.word, dir, first=True
                         )
                         await self.fill_puzzle_until_queue_empty()
 
-        return {"map": self.map, "desc": self.desc, "words": self.words}
+        return {"map": self.map, "desc": self.desc}
+
+    async def insert_map_answer_into_db(self) -> None:
+        map_row = Puzzle(puzzle=self.map)
+        self.db.add(map_row)
+        self.db.flush()
+
+        insert_data = [
+            {"puzzle_id": map_row.id, "word_id": desc["id"], "num": desc["num"]}
+            for desc in self.desc
+        ]
+
+        self.db.bulk_insert_mappings(PuzzleAnswer, insert_data)
+        self.db.commit()
+
+
+class PuzzleReadService:
+    def __init__(self, db: Session = Depends(get_db)):
+        self.db = db
+
+    async def read_puzzle_from_db_by_id(self, puzzle_id) -> Dict:
+        """
+        데이터베이스에서 퍼즐 ID로 퍼즐과 정답 정보를 읽어와 반환한다.
+        Args:
+            puzzle_id (int): 반환할 퍼즐 ID
+        Returns:
+            Dict: 퍼즐, 정답 정보가 담긴 사전 데이터
+        """
+        puzzle = self.db.query(Puzzle).filter(Puzzle.id == puzzle_id).first()
+        answer = (
+            self.db.query(PuzzleAnswer.num, WordInfo.pos, WordInfo.desc, WordInfo.word)
+            .join(WordInfo, PuzzleAnswer.word_id == WordInfo.id)
+            .all()
+        )
+        answer_json = [
+            {"num": num, "desc": {"pos": pos, "desc": desc, "word": word}}
+            for num, pos, desc, word in answer
+        ]
+
+        return {"map": puzzle.puzzle, "desc": answer_json}
