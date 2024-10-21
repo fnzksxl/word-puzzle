@@ -20,4 +20,4 @@ async def create_puzzle(
 async def read_puzzle(
     puzzle_id: int, puzzle_service: PuzzleReadService = Depends(PuzzleReadService)
 ):
-    return await puzzle_service.read_puzzle_from_db_by_id(puzzle_id)
+    return await puzzle_service.read_puzzle_from_db_by_id()

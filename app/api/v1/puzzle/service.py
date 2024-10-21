@@ -274,10 +274,11 @@ class PuzzleCreateService:
 
 
 class PuzzleReadService:
-    def __init__(self, db: Session = Depends(get_db)):
+    def __init__(self, puzzle_id: int, db: Session = Depends(get_db)):
         self.db = db
+        self.puzzle_id = puzzle_id
 
-    async def read_puzzle_from_db_by_id(self, puzzle_id) -> Dict:
+    async def read_puzzle_from_db_by_id(self) -> Dict:
         """
         데이터베이스에서 퍼즐 ID로 퍼즐과 정답 정보를 읽어와 반환한다.
         Args:
@@ -285,12 +286,12 @@ class PuzzleReadService:
         Returns:
             Dict: 퍼즐, 정답 정보가 담긴 사전 데이터
         """
-        puzzle = self.db.query(Puzzle).filter(Puzzle.id == puzzle_id).first()
+        puzzle = self.db.query(Puzzle).filter(Puzzle.id == self.puzzle_id).first()
         if puzzle is None:
             raise PuzzleNotExistException()
         answer = (
             self.db.query(PuzzleAnswer.num, WordInfo.pos, WordInfo.desc, WordInfo.word)
-            .filter(PuzzleAnswer.puzzle_id == puzzle.id)
+            .filter(PuzzleAnswer.puzzle_id == self.puzzle_id)
             .join(WordInfo, PuzzleAnswer.word_id == WordInfo.id)
             .all()
         )
