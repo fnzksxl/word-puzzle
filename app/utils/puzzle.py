@@ -257,6 +257,9 @@ class PuzzleCreateService:
         return {"map": self.map, "desc": self.desc}
 
     async def insert_map_answer_into_db(self) -> None:
+        """
+        생성된 맵과 정답을 DB에 삽입한다.
+        """
         map_row = Puzzle(puzzle=self.map)
         self.db.add(map_row)
         self.db.flush()
@@ -287,9 +290,11 @@ class PuzzleReadService:
             raise PuzzleNotExistException()
         answer = (
             self.db.query(PuzzleAnswer.num, WordInfo.pos, WordInfo.desc, WordInfo.word)
+            .filter(PuzzleAnswer.puzzle_id == puzzle.id)
             .join(WordInfo, PuzzleAnswer.word_id == WordInfo.id)
             .all()
         )
+
         answer_json = [
             {"num": num, "desc": {"pos": pos, "desc": desc, "word": word}}
             for num, pos, desc, word in answer
