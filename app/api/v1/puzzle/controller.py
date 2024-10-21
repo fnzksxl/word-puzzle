@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, Depends
-from app.utils.puzzle import PuzzleCreateService, PuzzleReadService
-from app.schemas.puzzle import PuzzleSize
+from .service import PuzzleCreateService, PuzzleReadService
+from .schema import PuzzleSize
 
 router = APIRouter(tags=["PuzzleV1"], prefix="/puzzle")
 

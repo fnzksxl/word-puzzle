@@ -7,7 +7,7 @@ from sqlalchemy import func
 
 from app.models import WordInfo, Puzzle, PuzzleAnswer
 from app.database import get_db
-from app.exceptions.puzzle import PuzzleNotExistException
+from .exception import PuzzleNotExistException
 
 
 class PuzzleCreateService:
