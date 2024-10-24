@@ -47,3 +47,11 @@ class User(BaseDate, Base):
 
     def as_dict(self):
         return {column.name: getattr(self, column.name) for column in self.__table__.columns}
+
+
+class OAuth(BaseDate, Base):
+    __tablename__ = "oauth"
+
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    email = Column(VARCHAR(20), ForeignKey("user.email"), nullable=False)
+    provider = Column(VARCHAR(10), nullable=False)
