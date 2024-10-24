@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, Depends
 
-from .service import GeneralAuthService
+from .service import GeneralAuthService, GoogleOAuthService
 from .dependancy import get_general_auth_service
 
 router = APIRouter(tags=["AuthV1"], prefix="/auth")
@@ -15,4 +15,13 @@ async def general_register(auth_service: GeneralAuthService = Depends(get_genera
 
 @router.post("/general-login", status_code=status.HTTP_200_OK, description="EMAIL/PW로 로그인")
 async def general_login(auth_service: GeneralAuthService = Depends(get_general_auth_service)):
+    return await auth_service.login()
+
+
+@router.get(
+    "/oauth-register/google/callback",
+    status_code=status.HTTP_201_CREATED,
+    description="구글 소셜 로그인",
+)
+async def kakao_callback(auth_service: GoogleOAuthService = Depends(GoogleOAuthService)):
     return await auth_service.login()
