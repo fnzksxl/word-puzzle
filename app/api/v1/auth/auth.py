@@ -58,3 +58,26 @@ class AuthBase(ABC):
         return await self.cookie_service.attach_token_into_cookie(
             response, access_token, refresh_token
         )
+
+
+class OAuthBase(AuthBase):
+    """
+    GeneralAuth 서비스를 상속받아 OAuth 서비스의 기초가 되는 추상클래스
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    @abstractmethod
+    async def get_token(self):
+        """
+        OAuth 유저 정보 획득에 필요한 Token을 획득하는 추상 메소드
+        """
+        pass
+
+    @abstractmethod
+    async def get_userinfo(self):
+        """
+        Token으로 OAuth 유저 정보를 획득하는 추상 메소드
+        """
+        pass
