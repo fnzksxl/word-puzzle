@@ -23,7 +23,7 @@ class GeneralAuthService(AuthBase):
     아이디(이메일), 비밀번호로 회원가입/로그인, 인증 서비스 클래스
     """
 
-    def __init__(self, email: str, password: str, nickname: str, db: Session):
+    def __init__(self, email: str, password: str, db: Session, nickname: Optional[str] = None):
         """
         입력받은 이메일, 비밀번호, 닉네임을 초기화한다.
         """
@@ -55,7 +55,11 @@ class GeneralAuthService(AuthBase):
             JSONResponse: 쿠키에 토큰 정보, 콘텐츠에 유저 정보를 담은 response 객체
         """
         user = self.db.query(User).filter(User.email == self.email).first()
-        if user and bcrypt.checkpw(self.password.encode(), user.password.encode()):
+        if (
+            user
+            and user.password
+            and bcrypt.checkpw(self.password.encode(), user.password.encode())
+        ):
             return await self._get_login_response(user)
         raise LoginNotValidIDPWException()
 
