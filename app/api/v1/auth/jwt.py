@@ -42,7 +42,7 @@ class JWTService:
             Dict or None: 해독 성공 시 정보를 담은 사전, 실패 시 None
         """
         try:
-            return jwt.decode(token, self.secret_key, algorithm=self.algorithm)
+            return jwt.decode(token, self.secret_key, algorithms=self.algorithm)
         except JWTError:
             return None
 
@@ -68,7 +68,7 @@ class JWTService:
         """
         JWT 토큰 해독 래퍼함수
         """
-        payload = self._decode(token, self.secret_key, self.algorithm)
+        payload = self._decode(token)
 
         now = datetime.timestamp(datetime.now(ZoneInfo("Asia/Seoul")))
         if payload and payload["exp"] < now:
