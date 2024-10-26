@@ -40,9 +40,9 @@ class PuzzleAnswer(BaseMin, Base):
 class User(BaseDate, Base):
     __tablename__ = "user"
 
-    email = Column(VARCHAR(20), unique=True, nullable=False)
+    email = Column(VARCHAR(30), unique=True, nullable=False)
     password = Column(VARCHAR(70), nullable=True)
-    nickname = Column(VARCHAR(10), nullable=False)
+    nickname = Column(VARCHAR(12), nullable=False)
     solved = Column(Integer, default=0)
 
     def as_dict(self):
