@@ -43,9 +43,8 @@ class GeneralAuthService(AuthBase):
         user = User(email=self.email, password=await self._hash_pw(), nickname=self.nickname)
         self.db.add(user)
         self.db.commit()
-        user_dict = user.as_dict()
-        user_dict.pop("password")
-        return {"user": user_dict}
+
+        return await self._get_login_response(user)
 
     async def login(self) -> JSONResponse:
         """
