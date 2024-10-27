@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, Depends
 
-from .service import GeneralAuthService, GoogleOAuthService
+from .service import GeneralAuthService, GoogleOAuthService, AuthHelper
 from .dependancy import (
     get_general_auth_service_login,
     get_general_auth_service_register,
@@ -31,6 +31,11 @@ async def general_login(auth_service: GeneralAuthService = Depends(get_general_a
 )
 async def kakao_callback(auth_service: GoogleOAuthService = Depends(GoogleOAuthService)):
     return await auth_service.login()
+
+
+@router.get("/duplicated", status_code=status.HTTP_200_OK, description="이메일 중복 확인")
+async def is_duplicated_email(email: str, auth_service: AuthHelper = Depends(AuthHelper)):
+    return await auth_service.is_duplicated(email)
 
 
 @router.get("/get-user", status_code=status.HTTP_200_OK, description="JWt 기반으로 유저 정보 반환")

@@ -18,6 +18,18 @@ from .exception import (
 )
 
 
+class AuthHelper:
+    def __init__(self, db: Session = Depends(get_db)):
+        self.db = db
+
+    async def is_duplicated(self, email) -> dict:
+        user = self.db.query(User).filter(User.email == email).first()
+        if user:
+            return {"is_duplicated": True}
+        else:
+            return {"is_duplicated": False}
+
+
 class GeneralAuthService(AuthBase):
     """
     아이디(이메일), 비밀번호로 회원가입/로그인, 인증 서비스 클래스
