@@ -11,11 +11,24 @@ from app.database import get_db
 from app.models import User, OAuth
 from .auth import AuthBase, OAuthBase
 from .exception import (
+    EmailDuplicatedException,
     GoogleRegisterException,
     GoogleGetTokenException,
     GoogleGetUserInfoException,
     LoginNotValidIDPWException,
 )
+
+
+class AuthHelper:
+    def __init__(self, db: Session = Depends(get_db)):
+        self.db = db
+
+    async def is_duplicated(self, email) -> dict:
+        user = self.db.query(User).filter(User.email == email).first()
+        if user:
+            return {"is_duplicated": True}
+        else:
+            return {"is_duplicated": False}
 
 
 class GeneralAuthService(AuthBase):
@@ -90,7 +103,9 @@ class GoogleOAuthService(OAuthBase):
 
     async def register(self) -> JSONResponse:
         try:
-            user = User(email=self.oauth_user_info.get("email", None), nickname="gimozzi")
+            email = self.oauth_user_info.get("email", None)
+            nickname = email.split("@")[0]
+            user = User(email=email, nickname=nickname)
             self.db.add(user)
             self.db.flush()
 
@@ -182,13 +197,18 @@ class GoogleOAuthService(OAuthBase):
         Returns:
             User or None: 정보가 있다면 User 객체, 아니면 None 반환
         """
-        oauth_user_info = (
-            self.db.query(OAuth)
-            .filter(OAuth.provider == self.provider, OAuth.email == user_info.get("email", None))
-            .first()
-        )
-        if oauth_user_info:
-            user = self.db.query(User).filter(User.id == oauth_user_info.user_id).first()
-            return user
-        self.oauth_user_info = user_info
-        return None
+
+        user = self.db.query(User).filter(User.email == user_info.get("email")).first()
+        if user:
+            oauth_user_info = (
+                self.db.query(OAuth)
+                .filter(OAuth.provider == self.provider, OAuth.email == user.email)
+                .first()
+            )
+            if oauth_user_info:
+                return user
+            else:
+                raise EmailDuplicatedException()
+        else:
+            self.oauth_user_info = user_info
+            return None

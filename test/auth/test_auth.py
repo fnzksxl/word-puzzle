@@ -62,6 +62,18 @@ async def test_google_register(client, session):
 @pytest.mark.asyncio
 @patch("app.api.v1.auth.service.GoogleOAuthService.get_token", new=mock.mock_post_token_request)
 @patch("app.api.v1.auth.service.GoogleOAuthService.get_userinfo", new=mock.mock_get_userinfo)
+async def test_google_register_failed_by_duplicated_email(client, user):
+    code = "dummmy code"
+    r = await client.get(f"/auth/oauth-register/google/callback?code={code}")
+    data = r.json()
+
+    assert r.status_code == 400
+    assert data.get("detail") == "중복된 이메일입니다."
+
+
+@pytest.mark.asyncio
+@patch("app.api.v1.auth.service.GoogleOAuthService.get_token", new=mock.mock_post_token_request)
+@patch("app.api.v1.auth.service.GoogleOAuthService.get_userinfo", new=mock.mock_get_userinfo)
 async def test_google_login(client, oauth_google_user):
     code = "dummmy code"
     r = await client.get(f"/auth/oauth-register/google/callback?code={code}")
@@ -70,3 +82,13 @@ async def test_google_login(client, oauth_google_user):
     assert r.status_code == 200
     assert data.get("email") == "test@test.com"
     assert data.get("nickname") == "test"
+
+
+@pytest.mark.asyncio
+async def test_check_duplicated_email(client, user):
+    email = "test@test.com"
+    r = await client.get(f"/auth/duplicated?email={email}")
+    data = r.json()
+
+    assert r.status_code == 200
+    assert data.get("is_duplicated")
