@@ -25,6 +25,10 @@ class Settings:
     GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
+    # Test Settings
+    TESTING = True if os.getenv("TESTING") == "true" else False
+    TEST_DB_NAME = os.getenv("TEST_DB_NAME")
+
 
 @lru_cache
 def get_settings():

@@ -2,3 +2,4 @@ venv/
 word-data/
 .env
 **/__pycache__/
+test/example/
