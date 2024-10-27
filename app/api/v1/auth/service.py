@@ -90,7 +90,9 @@ class GoogleOAuthService(OAuthBase):
 
     async def register(self) -> JSONResponse:
         try:
-            user = User(email=self.oauth_user_info.get("email", None), nickname="gimozzi")
+            email = self.oauth_user_info.get("email", None)
+            nickname = email.split("@")[0]
+            user = User(email=email, nickname=nickname)
             self.db.add(user)
             self.db.flush()
 
