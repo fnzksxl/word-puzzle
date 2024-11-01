@@ -33,12 +33,34 @@ async def test_general_login(client, user):
 
 @pytest.mark.asyncio
 async def test_get_user_by_token(client, token):
-    cookies = {"access": token}
+    cookies = {"access": token.get("access", None), "refresh": token.get("refresh", None)}
     r = await client.get("/auth/get-user", cookies=cookies)
     data = r.json()
 
     assert r.status_code == 200
     assert data.get("email", None) == "test@test.com"
+
+
+@pytest.mark.asyncio
+async def test_get_user_falied_by_no_token(client):
+    r = await client.get("/auth/get-user")
+    data = r.json()
+
+    assert r.status_code == 400
+    assert data.get("detail", None) == "토큰이 존재하지 않습니다."
+
+
+@pytest.mark.asyncio
+async def test_get_user_failed_by_expired_token(client, expired_token):
+    cookies = {
+        "access": expired_token.get("access", None),
+        "refresh": expired_token.get("refresh", None),
+    }
+    r = await client.get("/auth/get-user", cookies=cookies)
+    data = r.json()
+
+    assert r.status_code == 401
+    assert data.get("detail", None) == "만료된 토큰입니다."
 
 
 @pytest.mark.asyncio

@@ -24,3 +24,13 @@ class GoogleGetUserInfoException(HTTPException):
 class GoogleRegisterException(HTTPException):
     def __init__(self, detail: str = "구글 소셜 회원가입 과정에서 오류가 발생했습니다."):
         super().__init__(status_code=400, detail=detail)
+
+
+class TokenExpiredException(HTTPException):
+    def __init__(self, detail: str = "만료된 토큰입니다."):
+        super().__init__(status_code=401, detail=detail)
+
+
+class TokenNotExistException(HTTPException):
+    def __init__(self, detail: str = "토큰이 존재하지 않습니다."):
+        super().__init__(status_code=400, detail=detail)
