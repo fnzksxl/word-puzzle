@@ -4,7 +4,7 @@ from .service import GeneralAuthService, GoogleOAuthService, AuthHelper
 from .dependancy import (
     get_general_auth_service_login,
     get_general_auth_service_register,
-    get_userinfo_from_jwt,
+    get_userinfo_from_jwt_must,
 )
 
 router = APIRouter(tags=["AuthV1"], prefix="/auth")
@@ -39,5 +39,5 @@ async def is_duplicated_email(email: str, auth_service: AuthHelper = Depends(Aut
 
 
 @router.get("/get-user", status_code=status.HTTP_200_OK, description="JWt 기반으로 유저 정보 반환")
-async def get_user_by_jwt(user: dict = Depends(get_userinfo_from_jwt)):
+async def get_user_by_jwt(user: dict = Depends(get_userinfo_from_jwt_must)):
     return user
