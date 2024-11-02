@@ -3,7 +3,7 @@ from collections import deque
 from fastapi import Depends
 from sqlalchemy.orm.session import Session
 from typing import List, Tuple, Deque, Dict, Optional
-from sqlalchemy import func
+from sqlalchemy import func, desc
 
 from app.models import WordInfo, Puzzle, PuzzleAnswer
 from app.database import get_db
@@ -274,11 +274,11 @@ class PuzzleCreateService:
 
 
 class PuzzleReadService:
-    def __init__(self, puzzle_id: int, db: Session = Depends(get_db)):
+    def __init__(self, db: Session = Depends(get_db)):
         self.db = db
-        self.puzzle_id = puzzle_id
+        self.size = 4
 
-    async def read_puzzle_from_db_by_id(self) -> Dict:
+    async def read_puzzle_from_db_by_id(self, puzzle_id) -> Dict:
         """
         데이터베이스에서 퍼즐 ID로 퍼즐과 정답 정보를 읽어와 반환한다.
         Args:
@@ -286,12 +286,12 @@ class PuzzleReadService:
         Returns:
             Dict: 퍼즐, 정답 정보가 담긴 사전 데이터
         """
-        puzzle = self.db.query(Puzzle).filter(Puzzle.id == self.puzzle_id).first()
+        puzzle = self.db.query(Puzzle).filter(Puzzle.id == puzzle_id).first()
         if puzzle is None:
             raise PuzzleNotExistException()
         answer = (
             self.db.query(PuzzleAnswer.num, WordInfo.pos, WordInfo.desc, WordInfo.word)
-            .filter(PuzzleAnswer.puzzle_id == self.puzzle_id)
+            .filter(PuzzleAnswer.puzzle_id == puzzle_id)
             .join(WordInfo, PuzzleAnswer.word_id == WordInfo.id)
             .all()
         )
@@ -302,3 +302,24 @@ class PuzzleReadService:
         ]
 
         return {"map": puzzle.puzzle, "desc": answer_json}
+
+    async def get_puzzle_list_by_pagination(self, key: Optional[int] = None) -> Dict:
+        """
+        데이터베이스에서 id < key인 퍼즐 목록을 반환한다.
+        Args:
+            key (int): 커서
+        Returns:
+            list[Puzzle]: 최대 4개의 퍼즐 목록
+        """
+        if key:
+            puzzles = (
+                self.db.query(Puzzle)
+                .filter(Puzzle.id < key)
+                .order_by(desc(Puzzle.id))
+                .limit(self.size)
+                .all()
+            )
+        else:
+            puzzles = self.db.query(Puzzle).order_by(desc(Puzzle.id)).limit(self.size).all()
+
+        return {"item": puzzles, "next": None if puzzles[-1].id == 1 else puzzles[-1].id}
