@@ -286,7 +286,7 @@ class PuzzleReadService:
         Returns:
             Dict: 퍼즐, 정답 정보가 담긴 사전 데이터
         """
-        puzzle = self.db.query(Puzzle).filter(Puzzle.id == puzzle_id).first()
+        puzzle = self.db.query(Puzzle).filter(Puzzle.id == puzzle_id, Puzzle.is_exposed).first()
         if puzzle is None:
             raise PuzzleNotExistException()
         answer = (
@@ -314,12 +314,47 @@ class PuzzleReadService:
         if key:
             puzzles = (
                 self.db.query(Puzzle)
-                .filter(Puzzle.id < key)
+                .filter(Puzzle.id < key, Puzzle.is_exposed)
                 .order_by(desc(Puzzle.id))
                 .limit(self.size)
                 .all()
             )
         else:
-            puzzles = self.db.query(Puzzle).order_by(desc(Puzzle.id)).limit(self.size).all()
+            puzzles = (
+                self.db.query(Puzzle)
+                .filter(Puzzle.is_exposed)
+                .order_by(desc(Puzzle.id))
+                .limit(self.size)
+                .all()
+            )
+        if not puzzles:
+            raise PuzzleNotExistException()
 
-        return {"item": puzzles, "next": None if puzzles[-1].id == 1 else puzzles[-1].id}
+        return {
+            "item": [{"id": puzzle.id, "name": puzzle.name} for puzzle in puzzles],
+            "next": None if puzzles[-1].id == 1 else puzzles[-1].id,
+        }
+
+
+class PuzzleHandleService:
+    def __init__(self, db: Session = Depends(get_db)):
+        self.db = db
+
+    async def set_puzzle_name(self, puzzle_id: int, name: str) -> Dict:
+        """
+        퍼즐판의 이름을 변경 및 노출되도록 수정한다.
+        Args:
+            puzzle_id (int): 수정할 퍼즐 id
+            name (str): 수정 이후 사용될 이름
+        Returns:
+            Dict: 바뀐 이름과 바뀐 퍼즐의 id가 담긴 사전형 데이터
+        """
+        puzzle = self.db.query(Puzzle).filter(Puzzle.id == puzzle_id).first()
+        if puzzle is None:
+            raise PuzzleNotExistException()
+        puzzle.name = name
+        puzzle.is_exposed = True
+
+        self.db.commit()
+
+        return {"name": name, "id": puzzle_id}
