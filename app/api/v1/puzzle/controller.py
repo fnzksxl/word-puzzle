@@ -1,8 +1,9 @@
 from fastapi import APIRouter, status, Depends
 from typing import Optional
 
-from .service import PuzzleCreateService, PuzzleReadService
+from .service import PuzzleCreateService, PuzzleReadService, PuzzleHandleService
 from .schema import PuzzleSize
+from ..auth.dependancy import get_userinfo_from_jwt_must
 
 router = APIRouter(tags=["PuzzleV1"], prefix="/puzzle")
 
@@ -40,3 +41,13 @@ async def read_puzzles_on_main(
     key: Optional[int] = None, puzzle_service: PuzzleReadService = Depends(PuzzleReadService)
 ):
     return await puzzle_service.get_puzzle_list_by_pagination(key=key)
+
+
+@router.post("/name/update", status_code=status.HTTP_202_ACCEPTED, description="퍼즐 이름 수정")
+async def update_puzzle_name(
+    puzzle_id: int,
+    name: str,
+    user_info: dict = Depends(get_userinfo_from_jwt_must),
+    puzzle_service: PuzzleHandleService = Depends(PuzzleHandleService),
+):
+    return await puzzle_service.set_puzzle_name(puzzle_id=puzzle_id, name=name)
