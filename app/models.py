@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, VARCHAR, JSON, ForeignKey, DATETIME, func
+from sqlalchemy import Column, Integer, VARCHAR, JSON, ForeignKey, DATETIME, Boolean, func
 
 from app.database import Base
 
@@ -27,6 +27,7 @@ class Puzzle(BaseMin, Base):
 
     puzzle = Column(JSON, nullable=False)
     name = Column(VARCHAR(50), nullable=False, default=lambda: str(uuid.uuid4()))
+    is_exposed = Column(Boolean, nullable=False, default=False)
 
 
 class PuzzleAnswer(BaseMin, Base):

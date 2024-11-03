@@ -19,13 +19,32 @@ async def test_create_puzzle_error_with_size(client):
 
 @pytest.mark.asyncio
 async def test_get_puzzle(client, puzzle):
-    r = await client.get("/puzzle/1")
+    r = await client.get("/puzzle/search/1")
 
     assert r.status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_get_puzzle_error_with_wrong_id(client):
-    r = await client.get("/puzzle/2")
+    r = await client.get("/puzzle/search/2")
 
     assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_puzzles_on_main_page(client, four_puzzles):
+    r = await client.get("/puzzle/paginated")
+    data = r.json()
+
+    assert r.status_code == 200
+    assert len(data.get("item", None)) == 4
+    assert data.get("next") is None
+
+
+@pytest.mark.asyncio
+async def test_update_puzzle_name(client, puzzle):
+    r = await client.post(f"/puzzle/name/update?puzzle_id={puzzle.get('id')}&name=new_name")
+    data = r.json()
+
+    assert r.status_code == 202
+    assert data.get("name") == "new_name"
