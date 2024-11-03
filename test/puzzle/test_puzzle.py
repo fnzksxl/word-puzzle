@@ -39,3 +39,12 @@ async def test_get_puzzles_on_main_page(client, four_puzzles):
     assert r.status_code == 200
     assert len(data.get("item", None)) == 4
     assert data.get("next") is None
+
+
+@pytest.mark.asyncio
+async def test_update_puzzle_name(client, puzzle):
+    r = await client.post(f"/puzzle/name/update?puzzle_id={puzzle.get('id')}&name=new_name")
+    data = r.json()
+
+    assert r.status_code == 202
+    assert data.get("name") == "new_name"
