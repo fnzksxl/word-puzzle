@@ -15,10 +15,10 @@ async def create_puzzle(
     puzzle_size: PuzzleSize = Depends(),
     puzzle_service: PuzzleCreateService = Depends(PuzzleCreateService),
 ):
-    puzzle = await puzzle_service.create_puzzle_phase3()
+    await puzzle_service.create_puzzle_phase3()
     await puzzle_service.insert_map_answer_into_db()
 
-    return puzzle
+    return await puzzle_service.handle_response()
 
 
 @router.get(
@@ -50,4 +50,4 @@ async def update_puzzle_name(
     user_info: dict = Depends(get_userinfo_from_jwt_must),
     puzzle_service: PuzzleHandleService = Depends(PuzzleHandleService),
 ):
-    return await puzzle_service.set_puzzle_name(puzzle_id=puzzle_id, name=name)
+    return await puzzle_service.set_puzzle_name(puzzle_id=puzzle_id, name=name, id=user_info["id"])

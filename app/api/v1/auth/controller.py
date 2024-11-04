@@ -29,7 +29,7 @@ async def general_login(auth_service: GeneralAuthService = Depends(get_general_a
     status_code=status.HTTP_201_CREATED,
     description="구글 소셜 로그인",
 )
-async def kakao_callback(auth_service: GoogleOAuthService = Depends(GoogleOAuthService)):
+async def google_callback(auth_service: GoogleOAuthService = Depends(GoogleOAuthService)):
     return await auth_service.login()
 
 
@@ -41,3 +41,8 @@ async def is_duplicated_email(email: str, auth_service: AuthHelper = Depends(Aut
 @router.get("/get-user", status_code=status.HTTP_200_OK, description="JWt 기반으로 유저 정보 반환")
 async def get_user_by_jwt(user: dict = Depends(get_userinfo_from_jwt_must)):
     return user
+
+
+@router.get("/logout", status_code=status.HTTP_204_NO_CONTENT, description="로그아웃")
+async def logout(auth_service: AuthHelper = Depends(AuthHelper)):
+    return await auth_service.logout()

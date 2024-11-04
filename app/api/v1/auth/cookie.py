@@ -21,14 +21,42 @@ class Cookie:
         """
         response.set_cookie(
             key="access",
-            domain="localhost",
             samesite="None",
+            secure=True,
+            httponly=True,
             value=access_token,
         )
         response.set_cookie(
             key="refresh",
-            domain="localhost",
             samesite="None",
+            httponly=True,
+            secure=True,
             value=refresh_token,
+        )
+        return response
+
+    async def delete_token_from_cookie(self, response: JSONResponse) -> JSONResponse:
+        """
+        쿠키의 max_age를 0으로 설정해 쿠키를 지워준다.
+        Args:
+            response (JSONResponse): 쿠키를 제거할 response 객체
+        Returns:
+            JSONResponse: 쿠키가 제거된 response 객체
+        """
+        response.set_cookie(
+            key="access",
+            samesite="None",
+            secure=True,
+            httponly=True,
+            value="",
+            max_age=0,
+        )
+        response.set_cookie(
+            key="refresh",
+            samesite="None",
+            httponly=True,
+            secure=True,
+            value="",
+            max_age=0,
         )
         return response

@@ -5,7 +5,7 @@ from sqlalchemy.orm.session import Session
 from typing import List, Tuple, Deque, Dict, Optional
 from sqlalchemy import func, desc
 
-from app.models import WordInfo, Puzzle, PuzzleAnswer
+from app.models import WordInfo, Puzzle, PuzzleAnswer, User
 from app.database import get_db
 from .exception import PuzzleNotExistException
 
@@ -23,6 +23,7 @@ class PuzzleCreateService:
         self.queue = deque()
         self.desc = []
         self.num = 2
+        self.puzzle_id = 0
         self.word_size = 494047
 
     def create_map(self) -> List[str]:
@@ -104,14 +105,20 @@ class PuzzleCreateService:
 
         for i in range(word.len):
             if dir:
-                self.map[start_y][start_x + i] = 1
+                self.map[start_y][start_x + i] = word.word[i]
             else:
-                self.map[start_y + i][start_x] = 1
+                self.map[start_y + i][start_x] = word.word[i]
 
         self.desc.append(
             {
                 "num": 1,
-                "desc": {"desc": word.desc, "pos": word.pos, "word": word.word},
+                "desc": {
+                    "desc": word.desc,
+                    "pos": word.pos,
+                    "word": word.word,
+                    "dir": "across" if dir else "down",
+                    "startpoint": [0, 0],
+                },
                 "id": word.id,
             }
         )
@@ -190,14 +197,20 @@ class PuzzleCreateService:
                 continue
             for i in range(next_word.len):
                 if dir:
-                    self.map[point[0]][point[1] + i] = self.num
+                    self.map[point[0]][point[1] + i] = next_word.word[i]
                 else:
-                    self.map[point[0] + i][point[1]] = self.num
+                    self.map[point[0] + i][point[1]] = next_word.word[i]
 
             self.desc.append(
                 {
                     "num": self.num,
-                    "desc": {"desc": next_word.desc, "pos": next_word.pos, "word": next_word.word},
+                    "desc": {
+                        "desc": next_word.desc,
+                        "pos": next_word.pos,
+                        "word": next_word.word,
+                        "dir": "across" if dir else "down",
+                        "startpoint": [point[0], point[1]],
+                    },
                     "id": next_word.id,
                 }
             )
@@ -216,7 +229,7 @@ class PuzzleCreateService:
         await self.create_puzzle_phase1()
         await self.fill_puzzle_until_queue_empty()
 
-    async def create_puzzle_phase3(self) -> Dict:
+    async def create_puzzle_phase3(self) -> None:
         """
         퍼즐의 비어있는 공간에 단어를 추가한다.
         Returns:
@@ -237,14 +250,20 @@ class PuzzleCreateService:
                             continue
                         for k in range(word.len):
                             if dir:
-                                self.map[i][j + k] = self.num
+                                self.map[i][j + k] = word.word[k]
                             else:
-                                self.map[i + k][j] = self.num
+                                self.map[i + k][j] = word.word[k]
 
                         self.desc.append(
                             {
                                 "num": self.num,
-                                "desc": {"desc": word.desc, "pos": word.pos, "word": word.word},
+                                "desc": {
+                                    "desc": word.desc,
+                                    "pos": word.pos,
+                                    "word": word.word,
+                                    "dir": "across" if dir else "down",
+                                    "startpoint": [i, j],
+                                },
                                 "id": word.id,
                             }
                         )
@@ -254,7 +273,30 @@ class PuzzleCreateService:
                         )
                         await self.fill_puzzle_until_queue_empty()
 
-        return {"map": self.map, "desc": self.desc}
+    async def handle_response(self) -> Dict:
+        across = []
+        down = []
+        for item in self.desc:
+            if item["desc"]["dir"] == "across":
+                across.append(
+                    {
+                        "num": item["num"],
+                        "desc": item["desc"]["desc"],
+                        "pos": item["desc"]["pos"],
+                        "startpoint": item["desc"]["startpoint"],
+                    }
+                )
+            else:
+                down.append(
+                    {
+                        "num": item["num"],
+                        "desc": item["desc"]["desc"],
+                        "pos": item["desc"]["pos"],
+                        "startpoint": item["desc"]["startpoint"],
+                    }
+                )
+
+        return {"map": self.map, "across": across, "down": down, "id": self.puzzle_id}
 
     async def insert_map_answer_into_db(self) -> None:
         """
@@ -265,12 +307,21 @@ class PuzzleCreateService:
         self.db.flush()
 
         insert_data = [
-            {"puzzle_id": map_row.id, "word_id": desc["id"], "num": desc["num"]}
+            {
+                "puzzle_id": map_row.id,
+                "word_id": desc["id"],
+                "num": desc["num"],
+                "dir": desc["desc"]["dir"],
+                "start_x": desc["desc"]["startpoint"][0],
+                "start_y": desc["desc"]["startpoint"][1],
+            }
             for desc in self.desc
         ]
 
         self.db.bulk_insert_mappings(PuzzleAnswer, insert_data)
         self.db.commit()
+
+        self.puzzle_id = map_row.id
 
 
 class PuzzleReadService:
@@ -289,19 +340,48 @@ class PuzzleReadService:
         puzzle = self.db.query(Puzzle).filter(Puzzle.id == puzzle_id, Puzzle.is_exposed).first()
         if puzzle is None:
             raise PuzzleNotExistException()
-        answer = (
-            self.db.query(PuzzleAnswer.num, WordInfo.pos, WordInfo.desc, WordInfo.word)
+        answers = (
+            self.db.query(
+                PuzzleAnswer.num,
+                PuzzleAnswer.dir,
+                PuzzleAnswer.start_x,
+                PuzzleAnswer.start_y,
+                WordInfo.pos,
+                WordInfo.desc,
+            )
             .filter(PuzzleAnswer.puzzle_id == puzzle_id)
             .join(WordInfo, PuzzleAnswer.word_id == WordInfo.id)
             .all()
         )
+        across_json = []
+        down_json = []
+        for answer in answers:
+            if answer.dir == "across":
+                across_json.append(
+                    {
+                        "num": answer.num,
+                        "desc": answer.desc,
+                        "pos": answer.pos,
+                        "startpoint": [answer.start_x, answer.start_y],
+                    }
+                )
+            else:
+                down_json.append(
+                    {
+                        "num": answer.num,
+                        "desc": answer.desc,
+                        "pos": answer.pos,
+                        "startpoint": [answer.start_x, answer.start_y],
+                    }
+                )
 
-        answer_json = [
-            {"num": num, "desc": {"pos": pos, "desc": desc, "word": word}}
-            for num, pos, desc, word in answer
-        ]
-
-        return {"map": puzzle.puzzle, "desc": answer_json}
+        return {
+            "map": puzzle.puzzle,
+            "across": across_json,
+            "down": down_json,
+            "id": puzzle.id,
+            "solved": puzzle.solved,
+        }
 
     async def get_puzzle_list_by_pagination(self, key: Optional[int] = None) -> Dict:
         """
@@ -331,7 +411,10 @@ class PuzzleReadService:
             raise PuzzleNotExistException()
 
         return {
-            "item": [{"id": puzzle.id, "name": puzzle.name} for puzzle in puzzles],
+            "item": [
+                {"id": puzzle.id, "name": puzzle.name, "solved": puzzle.solved}
+                for puzzle in puzzles
+            ],
             "next": None if puzzles[-1].id == 1 else puzzles[-1].id,
         }
 
@@ -340,7 +423,7 @@ class PuzzleHandleService:
     def __init__(self, db: Session = Depends(get_db)):
         self.db = db
 
-    async def set_puzzle_name(self, puzzle_id: int, name: str) -> Dict:
+    async def set_puzzle_name(self, puzzle_id: int, name: str, id: int) -> Dict:
         """
         퍼즐판의 이름을 변경 및 노출되도록 수정한다.
         Args:
@@ -354,6 +437,10 @@ class PuzzleHandleService:
             raise PuzzleNotExistException()
         puzzle.name = name
         puzzle.is_exposed = True
+        puzzle.solved += 1
+
+        user = self.db.query(User).filter(User.id == id).first()
+        user.solved += 1
 
         self.db.commit()
 
