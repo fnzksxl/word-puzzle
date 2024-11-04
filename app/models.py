@@ -22,12 +22,13 @@ class WordInfo(BaseMin, Base):
     pos = Column(VARCHAR(7), nullable=False)
 
 
-class Puzzle(BaseMin, Base):
+class Puzzle(BaseDate, Base):
     __tablename__ = "puzzle"
 
     puzzle = Column(JSON, nullable=False)
     name = Column(VARCHAR(50), nullable=False, default=lambda: str(uuid.uuid4()))
     is_exposed = Column(Boolean, nullable=False, default=False)
+    solved = Column(Integer, nullable=False, default=0)
 
 
 class PuzzleAnswer(BaseMin, Base):
@@ -35,6 +36,9 @@ class PuzzleAnswer(BaseMin, Base):
 
     puzzle_id = Column(Integer, ForeignKey("puzzle.id"), nullable=False)
     word_id = Column(Integer, ForeignKey("wordinfo.id"), nullable=False)
+    dir = Column(VARCHAR(7), nullable=False)
+    start_x = Column(Integer, nullable=False)
+    start_y = Column(Integer, nullable=False)
     num = Column(Integer, nullable=False)
 
 
