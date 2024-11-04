@@ -9,6 +9,7 @@ from typing import Optional, Dict
 from app.config import settings
 from app.database import get_db
 from app.models import User, OAuth
+from .cookie import Cookie
 from .auth import AuthBase, OAuthBase
 from .exception import (
     EmailDuplicatedException,
@@ -30,13 +31,27 @@ class AuthHelper:
         else:
             return {"is_duplicated": False}
 
+    async def logout(self) -> JSONResponse:
+        """
+        로그아웃하는 메소드
+        """
+        cookie_service = Cookie()
+        response = JSONResponse(content={"message": "로그아웃 성공"})
+        return await cookie_service.delete_token_from_cookie(response)
+
 
 class GeneralAuthService(AuthBase):
     """
     아이디(이메일), 비밀번호로 회원가입/로그인, 인증 서비스 클래스
     """
 
-    def __init__(self, email: str, password: str, db: Session, nickname: Optional[str] = None):
+    def __init__(
+        self,
+        email: str = None,
+        password: str = None,
+        db: Session = None,
+        nickname: Optional[str] = None,
+    ):
         """
         입력받은 이메일, 비밀번호, 닉네임을 초기화한다.
         """
@@ -152,7 +167,8 @@ class GoogleOAuthService(OAuthBase):
         async with httpx.AsyncClient() as client:
             response = await client.post(self.token_request_url, data=token_request_payload)
         result = response.json()
-
+        print(result)
+        print(self.redirect_uri)
         if "access_token" in result:
             return result["access_token"]
         else:
