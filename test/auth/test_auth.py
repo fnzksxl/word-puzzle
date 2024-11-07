@@ -43,7 +43,7 @@ async def test_get_user_by_token(client, token):
 
 @pytest.mark.asyncio
 async def test_get_user_falied_by_no_token(client):
-    r = await client.get("/auth/get-user")
+    r = await client.post("/puzzle/name/update?puzzle_id=1&name=test")
     data = r.json()
 
     assert r.status_code == 400
@@ -114,3 +114,10 @@ async def test_check_duplicated_email(client, user):
 
     assert r.status_code == 200
     assert data.get("is_duplicated")
+
+
+@pytest.mark.asyncio
+async def test_logout(client, token):
+    r = await client.get("/auth/logout")
+
+    assert r.status_code == 200
