@@ -42,8 +42,14 @@ async def test_get_puzzles_on_main_page(client, four_puzzles):
 
 
 @pytest.mark.asyncio
-async def test_update_puzzle_name(client, puzzle):
-    r = await client.post(f"/puzzle/name/update?puzzle_id={puzzle.get('id')}&name=new_name")
+async def test_update_puzzle_name(client, token, puzzle):
+    cookies = {
+        "access": token.get("access", None),
+        "refresh": token.get("refresh", None),
+    }
+    r = await client.post(
+        f"/puzzle/name/update?puzzle_id={puzzle.get('id')}&name=new_name", cookies=cookies
+    )
     data = r.json()
 
     assert r.status_code == 202
