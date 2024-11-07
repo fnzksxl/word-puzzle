@@ -34,6 +34,8 @@ def get_userinfo(request: Request, jwt_service: JWTService = Depends(JWTService)
             return user_info
         else:
             raise TokenExpiredException()
+    else:
+        return None
 
 
 def get_userinfo_from_jwt_must(user_info: dict = Depends(get_userinfo)) -> Optional[dict]:
@@ -45,4 +47,4 @@ def get_userinfo_from_jwt_must(user_info: dict = Depends(get_userinfo)) -> Optio
 def get_userinfo_from_jwt_not_must(user_info: dict = Depends(get_userinfo)) -> Optional[dict]:
     if user_info:
         return user_info
-    return None
+    return {"id": 0}
