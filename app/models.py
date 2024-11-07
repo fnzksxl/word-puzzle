@@ -60,3 +60,10 @@ class OAuth(BaseDate, Base):
     user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     email = Column(VARCHAR(20), ForeignKey("user.email"), nullable=False)
     provider = Column(VARCHAR(10), nullable=False)
+
+
+class Solved(BaseMin, Base):
+    __tablename__ = "solved"
+
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    puzzle_id = Column(Integer, ForeignKey("puzzle.id"), nullable=False)
