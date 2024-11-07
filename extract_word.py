@@ -50,6 +50,7 @@ def process_senseinfo(senseinfo):
     definition = senseinfo["definition"].strip()
     word_type = senseinfo["type"].strip()
     pos = senseinfo.get("pos", None)
+    cat_info = senseinfo.get("cat_info", None)
 
     if pos is None or pos == "품사 없음":
         return None
@@ -66,8 +67,14 @@ def process_senseinfo(senseinfo):
         or "준말" in definition
         or "옛말" in definition
         or "-" in definition
+        or "<sub>" in definition
     ):
         return None
+
+    if cat_info:
+        for cat in cat_info:
+            if cat["cat"] == "인명" or cat["cat"] == "지명":
+                return None
 
     return {"definition": definition, "pos": pos}
 
